@@ -1,0 +1,75 @@
+// API service functions for backend communication
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+
+import { authService } from "./auth"
+
+const apiRequest = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`
+  const config = {
+    headers: {
+      "Content-Type": "application/json",
+      ...authService.getAuthHeaders(),
+      ...options.headers,
+    },
+    ...options,
+  }
+
+  const response = await fetch(url, config)
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || "API request failed")
+  }
+
+  return data
+}
+
+export const adminAPI = {
+  // User management
+  getUnapprovedUsers: () => apiRequest("/auth/unapproved"),
+  approveUser: (userId) => apiRequest(`/auth/approve/${userId}`, { method: "PATCH" }),
+
+  // Exam results
+  uploadExamResult: (resultData) =>
+    apiRequest("/results/upload", {
+      method: "POST",
+      body: JSON.stringify(resultData),
+    }),
+
+  // Certificates
+  generateCertificate: (certificateData) =>
+    apiRequest("/certificates/generate", {
+      method: "POST",
+      body: JSON.stringify(certificateData),
+    }),
+
+  // Fingerprint
+  enrollFingerprint: (userId, data) =>
+    apiRequest("/fingerprint/enroll", {
+      method: "POST",
+      body: JSON.stringify({ userId, data }),
+    }),
+}
+
+export const publicAPI = {
+  // Certificate verification
+  verifyCertificate: (certificateId) => apiRequest(`/certificates/verify?certificateId=${certificateId}`),
+
+  // Fingerprint verification
+  verifyFingerprint: (userId, data) =>
+    apiRequest("/fingerprint/verify", {
+      method: "POST",
+      body: JSON.stringify({ userId, data }),
+    }),
+}
+
+export const studentAPI = {
+  // Get student's exam results
+  getMyExamResults: () => apiRequest("/results/my-results"),
+
+  // Get student's certificates
+  getMyCertificates: () => apiRequest("/certificates/my-certificates"),
+
+  // Get specific certificate details
+  getCertificateDetails: (certificateId) => apiRequest(`/certificates/details/${certificateId}`),
+}
