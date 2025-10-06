@@ -6,8 +6,9 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "db:init": "node -e \"require('dotenv').config(); require('./dbInit').init().then(()=>{console.log('DB ready'); process.exit(0);}).catch(e=>{console.error(e); process.exit(1);})\"",
+    "seed:admin": "node seeders/adminSeeder.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:admin": "node -e \"require('dotenv').config(); const mongoose=require('mongoose'); const User=require('./models/User'); (async()=>{ try{ await mongoose.connect(process.env.MONGO_URI); const email=process.env.ADMIN_EMAIL; const password=process.env.ADMIN_PASSWORD; const name=process.env.ADMIN_NAME||'Administrator'; if(!email||!password){ console.error('ADMIN_EMAIL/ADMIN_PASSWORD required'); process.exit(1);} let u=await User.findOne({email}); if(!u){ u=new User({name,email,password,role:'admin',isApproved:true}); await u.save(); console.log('Seeded admin:', email); } else { let changed=false; if(u.role!=='admin'){u.role='admin'; changed=true;} if(!u.isApproved){u.isApproved=true; changed=true;} if(password){u.password=password; changed=true;} if(changed){ await u.save(); console.log('Updated admin:', email);} else { console.log('Admin already up-to-date:', email);} } await mongoose.disconnect(); process.exit(0);} catch(e){ console.error('Seeding failed:', e); process.exit(1);} })(); \"",
     "seed:admin:inline": "SET ADMIN_EMAIL=admin@example.com&& SET ADMIN_PASSWORD=Admin@123&& SET ADMIN_NAME=Admin&& npm run seed:admin"
   },
   "keywords": [],
@@ -16,11 +17,11 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "pg": "^8.12.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.17.1",
     "multer": "^2.0.2",
     "pdfkit": "^0.17.1",
     "qrcode": "^1.5.4",

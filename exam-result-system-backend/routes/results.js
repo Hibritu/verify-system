@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth, adminOnly } = require('../middleware/auth');
-const ExamResult = require('../models/ExamResult');
-const mongoose = require('mongoose');
+const { query } = require('../db');
 
 /**
  * @swagger
@@ -62,24 +61,63 @@ router.post('/upload', auth, adminOnly, async (req, res) => {
       return res.status(400).json({ message: 'Missing or invalid fields' });
     }
 
-    // Optional: Check if userId is a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid userId' });
-    }
-
-    const examResult = new ExamResult({ userId, examName, year, scores });
-    await examResult.save();
-
-    res.status(201).json({ 
-      message: 'Exam result uploaded',
-      examResultId: examResult._id 
-    });
+    const insert = await query(
+      'INSERT INTO exam_results(user_id, exam_name, year, scores) VALUES($1,$2,$3,$4) RETURNING id',
+      [userId, examName, year, scores]
+    );
+    res.status(201).json({ message: 'Exam result uploaded', examResultId: insert.rows[0].id });
   } catch (err) {
     console.error('Upload ExamResult Error:', err)
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-
+/**
+ * @swagger
+ * /api/results/recent:
+ *   get:
+ *     summary: Get recent exam results (admin only)
+ *     tags: [Exam Results]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Recent exam results retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 examResults:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       userId:
+ *                         type: string
+ *                       examName:
+ *                         type: string
+ *                       year:
+ *                         type: integer
+ *                       scores:
+ *                         type: object
+ *                       createdAt:
+ *                         type: string
+ *       500:
+ *         description: Server error
+ */
+router.get('/recent', auth, adminOnly, async (req, res) => {
+  try {
+    const r = await query(
+      'SELECT id as "_id", user_id as "userId", exam_name as "examName", year, scores, created_at as "createdAt" FROM exam_results ORDER BY created_at DESC LIMIT 10'
+    );
+    res.json({ examResults: r.rows });
+  } catch (err) {
+    console.error('Get Recent ExamResults Error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 module.exports = router;

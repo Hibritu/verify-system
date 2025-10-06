@@ -16,7 +16,35 @@ export function QRCodeScanner() {
   const [scanResult, setScanResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [ready, setReady] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Pre-flight checks for camera availability and secure context
+    async function checkEnvironment() {
+      if (typeof window === 'undefined') return;
+      if (!window.isSecureContext) {
+        setError('Camera access requires HTTPS or localhost. Please use a secure origin.');
+        return;
+      }
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setError('Camera API not available in this browser. Try updating or using a different browser.');
+        return;
+      }
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasCamera = devices.some((d) => d.kind === 'videoinput');
+        if (!hasCamera) {
+          setError('No camera found. Connect a camera and try again.');
+          return;
+        }
+        setReady(true);
+      } catch (e) {
+        setError('Unable to check camera devices. Please verify permissions.');
+      }
+    }
+    checkEnvironment();
+  }, []);
 
   const handleScan = async (result) => {
     if (result) {
@@ -53,7 +81,20 @@ export function QRCodeScanner() {
 
   const handleError = (err) => {
     console.error('QR Scanner error:', err);
-    setError('Failed to initialize scanner. Please check camera permissions.');
+    const message = typeof err === 'string' ? err : err?.message;
+    if (message?.includes('NotAllowedError') || message?.includes('Permission denied')) {
+      setError('Camera permission denied. Please allow camera access in your browser settings.');
+      return;
+    }
+    if (message?.includes('NotFoundError') || message?.includes('no video input devices')) {
+      setError('No camera found. Connect a camera and try again.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setError('Camera access requires HTTPS or localhost. Please use a secure origin.');
+      return;
+    }
+    setError('Failed to initialize scanner. Please check camera permissions and try again.');
   };
 
   const resetScanner = () => {
@@ -77,7 +118,7 @@ export function QRCodeScanner() {
         </div>
       )}
 
-      {!scanResult && !loading && (
+      {!scanResult && !loading && ready && (
         <div className="w-full rounded-lg overflow-hidden border-2 border-dashed border-gray-300 p-2">
           <QrScanner
             onDecode={handleScan}
@@ -99,6 +140,12 @@ export function QRCodeScanner() {
               objectFit: 'cover'
             }}
           />
+        </div>
+      )}
+
+      {!ready && !loading && !scanResult && (
+        <div className="w-full text-sm text-gray-600 mb-4">
+          Initializing camera...
         </div>
       )}
 

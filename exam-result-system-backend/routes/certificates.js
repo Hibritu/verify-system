@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { auth, adminOnly } = require('../middleware/auth');
-const Certificate = require('../models/Certificate');
-const ExamResult = require('../models/ExamResult');
+const { query } = require('../db');
 const crypto = require('crypto');
 const QRCode = require("qrcode");
-const User = require('../models/User'); // adjust path if different
-const mongoose = require('mongoose');
+// Keeping models present per user request; route logic uses Postgres
 
 /**
  * @swagger
@@ -66,33 +64,22 @@ router.post('/generate', auth, adminOnly, async (req, res) => {
       return res.status(400).json({ message: 'Missing fields' });
     }
 
-    // Validate ObjectId formats to avoid CastError 500s
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid userId' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(examResultId)) {
-      return res.status(400).json({ message: 'Invalid examResultId' });
-    }
+    const userRes = await query('SELECT id, name, email FROM users WHERE id=$1', [userId]);
+    if (userRes.rowCount === 0) return res.status(404).json({ message: 'User not found' });
+    const user = userRes.rows[0];
 
-    // Fetch user
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    // Fetch exam result
-    const examResult = await ExamResult.findById(examResultId);
-    if (!examResult) return res.status(404).json({ message: 'Exam result not found' });
+    const examRes = await query('SELECT id, exam_name, year, scores FROM exam_results WHERE id=$1 AND user_id=$2', [examResultId, userId]);
+    if (examRes.rowCount === 0) return res.status(404).json({ message: 'Exam result not found' });
+    const examResult = examRes.rows[0];
 
     // Generate unique certificate ID
     const certificateId = crypto.randomBytes(8).toString('hex');
 
     // Save certificate
-    const certificate = new Certificate({
-      userId,
-      examResultId,
-      certificateId,
-      issuedAt: new Date()
-    });
-    await certificate.save();
+    const insert = await query(
+      'INSERT INTO certificates(user_id, exam_result_id, certificate_id, issued_at) VALUES ($1,$2,$3,NOW()) RETURNING issued_at',
+      [userId, examResultId, certificateId]
+    );
 
     // Generate QR code containing verification URL
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-certificate/${certificateId}`;
@@ -103,16 +90,9 @@ router.post('/generate', auth, adminOnly, async (req, res) => {
       message: 'Certificate generated successfully',
       certificate: {
         certificateId,
-        issuedAt: certificate.issuedAt,
-        user: {
-          name: user.name,
-          email: user.email
-        },
-        exam: {
-          examName: examResult.examName,
-          year: examResult.year,
-          scores: examResult.scores
-        },
+        issuedAt: insert.rows[0].issued_at,
+        user: { name: user.name, email: user.email },
+        exam: { examName: examResult.exam_name, year: examResult.year, scores: examResult.scores },
         qrCode: qrCodeData
       }
     });
@@ -148,18 +128,26 @@ router.get('/verify', async (req, res) => {
     const { certificateId } = req.query;
     if (!certificateId) return res.status(400).json({ message: 'certificateId required' });
 
-    const certificate = await Certificate.findOne({ certificateId }).populate('userId examResultId');
-    if (!certificate || certificate.revoked)
-      return res.status(404).json({ message: 'Certificate not valid' });
-
+    const r = await query(
+      `SELECT c.certificate_id, c.issued_at, c.revoked,
+              u.id as user_id, u.name as user_name, u.email as user_email,
+              e.id as exam_result_id, e.exam_name, e.year, e.scores
+         FROM certificates c
+         JOIN users u ON u.id=c.user_id
+         JOIN exam_results e ON e.id=c.exam_result_id
+        WHERE c.certificate_id=$1`,
+      [certificateId]
+    );
+    if (r.rowCount === 0 || r.rows[0].revoked) return res.status(404).json({ message: 'Certificate not valid' });
+    const row = r.rows[0];
     res.json({
-      certificateId: certificate.certificateId,
-      user: certificate.userId,
-      userId: certificate.userId, // compatibility for frontend expecting userId
-      examResult: certificate.examResultId,
-      examResultId: certificate.examResultId, // compatibility for frontend expecting examResultId
-      issuedAt: certificate.issuedAt,
-      revoked: certificate.revoked,
+      certificateId: row.certificate_id,
+      user: { id: row.user_id, name: row.user_name, email: row.user_email },
+      userId: row.user_id,
+      examResult: { id: row.exam_result_id, examName: row.exam_name, year: row.year, scores: row.scores },
+      examResultId: row.exam_result_id,
+      issuedAt: row.issued_at,
+      revoked: row.revoked,
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -170,11 +158,14 @@ router.get('/verify', async (req, res) => {
 router.get('/my-certificates', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid userId in token' });
-    }
-
-    const certs = await Certificate.find({ userId }).populate('examResultId');
+    const certs = await query(
+      `SELECT c.id, c.certificate_id, c.issued_at, c.revoked,
+              e.exam_name, e.year, e.scores
+         FROM certificates c
+         JOIN exam_results e ON e.id=c.exam_result_id
+        WHERE c.user_id=$1`,
+      [userId]
+    );
 
     const computeAverage = (scores = {}) => {
       const vals = Object.values(scores);
@@ -190,17 +181,16 @@ router.get('/my-certificates', auth, async (req, res) => {
       return 'F';
     };
 
-    const payload = certs.map((c) => {
-      const exam = c.examResultId || {};
-      const scores = exam.scores || {};
+    const payload = certs.rows.map((c) => {
+      const scores = c.scores || {};
       const average = computeAverage(scores);
       const grade = computeGrade(average);
       return {
-        _id: c._id,
-        certificateId: c.certificateId,
-        examName: exam.examName,
-        year: exam.year,
-        issuedAt: c.issuedAt,
+        _id: c.id,
+        certificateId: c.certificate_id,
+        examName: c.exam_name,
+        year: c.year,
+        issuedAt: c.issued_at,
         revoked: c.revoked,
         examResult: { scores, average, grade },
         qrCode: null,

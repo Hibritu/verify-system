@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 export function Stagger({ children, className }) {
   return (
     <motion.div
+      suppressHydrationWarning
       className={className}
       initial="hidden"
       animate="show"

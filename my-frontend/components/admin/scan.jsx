@@ -8,9 +8,22 @@ export function ScanPage() {
   const [message, setMessage] = useState("")
   const scannerRef = useRef(null)
   const [active, setActive] = useState(false)
+  const [initError, setInitError] = useState("")
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
   useEffect(() => {
+    // Environment checks before initializing the scanner
+    if (typeof window !== 'undefined') {
+      if (!window.isSecureContext) {
+        setInitError("Camera access requires HTTPS or localhost. Please use a secure origin.")
+        return
+      }
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setInitError("Camera API not available in this browser. Try updating or use a different browser.")
+        return
+      }
+    }
+
     if (active && !scannerRef.current) {
       const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 })
 
@@ -46,7 +59,18 @@ export function ScanPage() {
 
           console.log("Decoded text:", decodedText)
         },
-        (error) => console.warn("QR scan error", error)
+        (error) => {
+          const msg = typeof error === 'string' ? error : error?.message
+          if (msg?.includes('NotAllowedError') || msg?.includes('Permission denied')) {
+            setInitError('Camera permission denied. Please allow access in browser settings and reload.')
+            return
+          }
+          if (msg?.includes('NotFoundError') || msg?.includes('no video input devices')) {
+            setInitError('No camera found. Connect a camera and try again.')
+            return
+          }
+          console.warn("QR scan error", error)
+        }
       )
 
       scannerRef.current = scanner
@@ -65,6 +89,10 @@ export function ScanPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Scan QR Code</h1>
           <p className="text-gray-600">Point your camera at a QR code to verify and download certificates</p>
         </div>
+
+        {initError && (
+          <div className="mb-4 text-sm text-red-700 bg-red-100 border border-red-200 rounded p-3">{initError}</div>
+        )}
         
         <div className="relative group">
           <div 

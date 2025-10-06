@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 export function FadeIn({ delay = 0, children, className }) {
   return (
     <motion.div
+      suppressHydrationWarning
       className={className}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}

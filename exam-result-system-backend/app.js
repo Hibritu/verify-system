@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const { init } = require('./dbInit');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const { performance } = require('perf_hooks');
@@ -33,10 +33,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- MongoDB connection ---
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error(err));
+// --- Postgres init ---
+init().then(() => console.log('PostgreSQL ready')).catch((err) => {
+  console.error('PostgreSQL init failed', err);
+});
 
 // --- Swagger setup ---
 const swaggerOptions = {

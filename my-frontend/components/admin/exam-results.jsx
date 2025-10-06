@@ -130,7 +130,7 @@ export function ExamResults() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Subject Scores</Label>
+              <Label>Subject </Label>
               <Button type="button" variant="outline" size="sm" onClick={addSubject}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Subject

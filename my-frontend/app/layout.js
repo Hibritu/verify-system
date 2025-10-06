@@ -1,5 +1,6 @@
 import "./globals.css";
 import { AuthProvider } from "../hooks/use-auth.js";
+import { ThemeProvider } from "../components/theme-provider";
 
 export const metadata = {
   title: "Exam Verification System",
@@ -11,7 +12,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

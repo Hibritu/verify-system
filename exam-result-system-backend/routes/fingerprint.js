@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth, adminOnly } = require('../middleware/auth');
-const Fingerprint = require('../models/Fingerprint');
-const Certificate = require('../models/Certificate');
+const { query } = require('../db');
 /**
  * @swagger
  * /api/fingerprint/enroll:
@@ -42,19 +41,16 @@ router.post('/enroll', auth, adminOnly, async (req, res) => {
       return res.status(400).json({ message: 'Missing userId or data' });
     }
 
-    // Prevent duplicate enrollments for same user and fingerprint data
-    const exists = await Fingerprint.findOne({ userId, data });
-    if (exists) {
+    const exists = await query('SELECT 1 FROM fingerprints WHERE user_id=$1 AND data=$2', [userId, data]);
+    if (exists.rowCount) {
       return res.status(409).json({ message: 'Fingerprint already enrolled' });
     }
 
-    // Save fingerprint data linked to the user
-    const fp = new Fingerprint({ userId, data });
-    await fp.save();
+    const fp = await query('INSERT INTO fingerprints(user_id, data) VALUES($1,$2) RETURNING id', [userId, data]);
 
     res
       .status(201)
-      .json({ message: 'Fingerprint enrolled', fingerprintId: fp._id });
+      .json({ message: 'Fingerprint enrolled', fingerprintId: fp.rows[0].id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -104,10 +100,8 @@ router.post('/verify', auth, async (req, res) => {
     if (!userId || !data) 
       return res.status(400).json({ message: 'Missing userId or data' });
 
-    // Find a fingerprint by userId and data
-    const fingerprint = await Fingerprint.findOne({ userId, data });
-
-    const isMatch = !!fingerprint;
+    const r = await query('SELECT 1 FROM fingerprints WHERE user_id=$1 AND data=$2', [userId, data]);
+    const isMatch = r.rowCount > 0;
 
     res.status(200).json({
       message: isMatch ? 'Fingerprint verified' : 'Fingerprint does not match',

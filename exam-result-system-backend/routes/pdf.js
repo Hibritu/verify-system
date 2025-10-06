@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
-const PdfCertificate = require('../models/PdfCertificate');
+const { query } = require('../db');
 const { auth, adminOnly } = require('../middleware/auth');
 
 // --- Ensure Encryption Key Exists ---
@@ -56,25 +56,28 @@ router.post('/upload', auth, adminOnly, upload.single('pdf'), async (req, res) =
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const pdf = new PdfCertificate({
-      title: req.body.title || 'Untitled',
-      filename: req.file.filename,
-      uploadedBy: req.user.id,
-    });
+    // Insert placeholder to generate ID
+    const insert = await query(
+      'INSERT INTO pdf_certificates(title, filename, uploaded_by, encrypted_url) VALUES($1,$2,$3,$4) RETURNING id',
+      [req.body.title || 'Untitled', req.file.filename, req.user.id, '']
+    );
+    const pdfId = insert.rows[0].id;
 
-    // Encrypt ID and save
-    const encryptedId = encrypt(pdf._id.toString());
-    pdf.encryptedUrl = encryptedId;
-    await pdf.save();
+    // Encrypt ID and update row
+    const encryptedId = encrypt(pdfId);
+    await query('UPDATE pdf_certificates SET encrypted_url=$1 WHERE id=$2', [encryptedId, pdfId]);
 
     // Generate QR code
     const qrCodeData = await QRCode.toDataURL(encryptedId);
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const pdfUrl = `${baseUrl}/api/pdf/${encodeURIComponent(pdf.filename)}`;
-    const downloadUrl = `${baseUrl}/api/pdf/by-id/${pdf._id.toString()}`;
+    const pdfUrl = `${baseUrl}/api/pdf/${encodeURIComponent(req.file.filename)}`;
+    const downloadUrl = `${baseUrl}/api/pdf/by-id/${pdfId}`;
 
-    return res.json({ pdf, qrCodeData, pdfUrl, downloadUrl });
+    return res.json({ 
+      pdf: { id: pdfId, title: req.body.title || 'Untitled', filename: req.file.filename, encryptedUrl: encryptedId },
+      qrCodeData, pdfUrl, downloadUrl 
+    });
   } catch (err) {
     console.error('Upload error:', err);
     return res.status(500).json({ error: 'Internal server error', details: err.message });
@@ -84,17 +87,18 @@ router.post('/upload', auth, adminOnly, upload.single('pdf'), async (req, res) =
 // --- Route: Safer download by ID (Place BEFORE :filename) ---
 router.get('/by-id/:id', auth, async (req, res) => {
   try {
-    const pdf = await PdfCertificate.findById(req.params.id);
-    if (!pdf) return res.status(404).json({ error: 'PDF not found' });
+    const r = await query('SELECT filename FROM pdf_certificates WHERE id=$1', [req.params.id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'PDF not found' });
+    const filename = r.rows[0].filename;
 
-    const filePath = path.join(__dirname, '../uploads', pdf.filename);
+    const filePath = path.join(__dirname, '../uploads', filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
 
     const mode = req.query.mode === 'inline' ? 'inline' : 'attachment';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Disposition', `${mode}; filename="${encodeURIComponent(pdf.filename)}"`);
+    res.setHeader('Content-Disposition', `${mode}; filename="${encodeURIComponent(filename)}"`);
     return res.sendFile(filePath);
   } catch (err) {
     console.error('Serve PDF by-id error:', err);
@@ -122,22 +126,34 @@ router.get('/:filename', auth, async (req, res) => {
 
 // --- Route: Decrypt encrypted string and return file URLs ---
 router.post('/decrypt', auth, async (req, res) => {
-  try {
-    const { encrypted } = req.body;
-    if (!encrypted) return res.status(400).json({ error: 'No encrypted data provided' });
+  const { encrypted } = req.body;
+  if (!encrypted) return res.status(400).json({ error: 'No encrypted data provided' });
 
-    const pdfId = decrypt(encrypted);
-    const pdf = await PdfCertificate.findById(pdfId);
-    if (!pdf) return res.status(404).json({ error: 'PDF not found' });
+  // Basic format check: hex IV + ':' + hex ciphertext
+  const isMaybeHex = /^[0-9a-fA-F]+:[0-9a-fA-F]+$/.test(encrypted);
+  if (!isMaybeHex) return res.status(400).json({ error: 'Invalid encrypted string format' });
+
+  let pdfId;
+  try {
+    pdfId = decrypt(encrypted);
+  } catch (err) {
+    console.error('Decrypt parse error:', err);
+    return res.status(400).json({ error: 'Invalid encrypted string' });
+  }
+
+  try {
+    const r = await query('SELECT filename FROM pdf_certificates WHERE id=$1', [pdfId]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'PDF not found' });
+    const filename = r.rows[0].filename;
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const pdfUrl = `${baseUrl}/api/pdf/${encodeURIComponent(pdf.filename)}`;
-    const downloadUrl = `${baseUrl}/api/pdf/by-id/${pdf._id.toString()}`;
+    const pdfUrl = `${baseUrl}/api/pdf/${encodeURIComponent(filename)}`;
+    const downloadUrl = `${baseUrl}/api/pdf/by-id/${pdfId}`;
 
     return res.json({ pdfUrl, downloadUrl });
   } catch (err) {
-    console.error('Decrypt error:', err);
-    return res.status(400).json({ error: 'Invalid encrypted string' });
+    console.error('Decrypt DB error:', err);
+    return res.status(500).json({ error: 'Server error while resolving PDF' });
   }
 });
 
