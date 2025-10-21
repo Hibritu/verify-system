@@ -68,6 +68,11 @@ app.use('/api/fingerprint', require('./routes/fingerprint'));
 app.use('/api/results', require('./routes/results'));
 app.use('/api/certificates', require('./routes/certificates'));
 
+// --- Root redirect to Swagger Docs ---
+app.get('/', (req, res) => {
+  res.redirect('/api-docs');
+});
+
 // --- Start Server ---
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
