@@ -1,5 +1,5 @@
 // Authentication utilities for JWT token management
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://exam-result-system-backend.onrender.com/api"
 
 export const authService = {
   // Store token in localStorage
