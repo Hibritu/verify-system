@@ -1,5 +1,5 @@
 // API service functions for backend communication
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://exam-result-system-backend.onrender.com/api"
 
 import { authService } from "./auth"
 
