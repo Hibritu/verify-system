@@ -5,11 +5,10 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-  "dev": "nodemon app.js",
-  "db:init": "node -e \"require('dotenv').config(); require('./dbInit').init().then(()=>{console.log('DB ready'); process.exit(0);}).catch(e=>{console.error(e); process.exit(1);})\"",
-  "seed:admin": "node seeders/adminSeeder.js"
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:admin:inline": "SET ADMIN_EMAIL=admin@example.com&& SET ADMIN_PASSWORD=Admin@123&& SET ADMIN_NAME=Admin&& npm run seed:admin"
+    "dev": "nodemon app.js",
+    "db:init": "node -e \"require('dotenv').config(); require('./dbInit').init().then(()=>{console.log('DB ready'); process.exit(0);}).catch(e=>{console.error(e); process.exit(1);})\"",
+    "seed:admin": "node seeders/adminSeeder.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
