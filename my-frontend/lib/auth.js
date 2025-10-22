@@ -1,5 +1,5 @@
 // Authentication utilities for JWT token management
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api-docs/"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api"
 
 export const authService = {
   // Store token in localStorage
