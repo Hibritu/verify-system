@@ -72,6 +72,8 @@ app.use('/api/certificates', require('./routes/certificates'));
 app.get('/', (req, res) => {
   res.redirect('/api-docs');
 });
+// --- Health check for Render ---
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
 
 // --- Start Server ---
 app.listen(PORT, () => {
