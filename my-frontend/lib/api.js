@@ -1,5 +1,5 @@
 // API service functions for backend communication
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api-docs/"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api"
 
 import { authService } from "./auth"
 
