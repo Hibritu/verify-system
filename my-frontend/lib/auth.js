@@ -54,43 +54,65 @@ export const authService = {
 
   // Login user
   login: async (email, password) => {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-    const data = await response.json()
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Login failed" }))
+        return { success: false, message: errorData.message || "Login failed" }
+      }
 
-    if (response.ok) {
-      authService.setToken(data.token)
-      authService.setUser({ id: data._id, role: data.role })
-      return { success: true, user: { id: data._id, role: data.role } }
-    } else {
-      return { success: false, message: data.message }
+      const data = await response.json()
+
+      if (response.ok) {
+        authService.setToken(data.token)
+        authService.setUser({ id: data._id, role: data.role })
+        return { success: true, user: { id: data._id, role: data.role } }
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      return { 
+        success: false, 
+        message: error.message || "Failed to connect to server. Please check if the backend is running." 
+      }
     }
   },
 
   // Register user
   register: async (name, email, password, role = "student") => {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, email, password, role }),
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, password, role }),
+      })
 
-    const data = await response.json()
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Registration failed" }))
+        return { success: false, message: errorData.message || "Registration failed" }
+      }
 
-    if (response.ok) {
-      authService.setToken(data.token)
-      authService.setUser({ id: data._id, role: data.role })
-      return { success: true, user: { id: data._id, role: data.role } }
-    } else {
-      return { success: false, message: data.message }
+      const data = await response.json()
+
+      if (response.ok) {
+        authService.setToken(data.token)
+        authService.setUser({ id: data._id, role: data.role })
+        return { success: true, user: { id: data._id, role: data.role } }
+      }
+    } catch (error) {
+      console.error("Registration error:", error)
+      return { 
+        success: false, 
+        message: error.message || "Failed to connect to server. Please check if the backend is running." 
+      }
     }
   },
 
