@@ -1,5 +1,10 @@
 // Authentication utilities for JWT token management
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api"
+// Use only `NEXT_PUBLIC_API_URL` from environment (no local fallback).
+// The environment value is expected to be the site root (e.g. https://verify-system-exam-result-system-backend.onrender.com)
+// and we append `/api` when building request URLs.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')}/api`
+  : undefined
 
 export const authService = {
   // Store token in localStorage
@@ -55,25 +60,25 @@ export const authService = {
   // Login user
   login: async (email, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      })
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Login failed" }))
         return { success: false, message: errorData.message || "Login failed" }
       }
 
-      const data = await response.json()
+    const data = await response.json()
 
-      if (response.ok) {
-        authService.setToken(data.token)
-        authService.setUser({ id: data._id, role: data.role })
-        return { success: true, user: { id: data._id, role: data.role } }
+    if (response.ok) {
+      authService.setToken(data.token)
+      authService.setUser({ id: data._id, role: data.role })
+      return { success: true, user: { id: data._id, role: data.role } }
       }
     } catch (error) {
       console.error("Login error:", error)
@@ -87,25 +92,25 @@ export const authService = {
   // Register user
   register: async (name, email, password, role = "student") => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, password, role }),
-      })
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, email, password, role }),
+    })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Registration failed" }))
         return { success: false, message: errorData.message || "Registration failed" }
       }
 
-      const data = await response.json()
+    const data = await response.json()
 
-      if (response.ok) {
-        authService.setToken(data.token)
-        authService.setUser({ id: data._id, role: data.role })
-        return { success: true, user: { id: data._id, role: data.role } }
+    if (response.ok) {
+      authService.setToken(data.token)
+      authService.setUser({ id: data._id, role: data.role })
+      return { success: true, user: { id: data._id, role: data.role } }
       }
     } catch (error) {
       console.error("Registration error:", error)

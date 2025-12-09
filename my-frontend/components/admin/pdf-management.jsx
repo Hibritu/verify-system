@@ -9,7 +9,9 @@ export function PdfManagement() {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [loading, setLoading] = useState(false);
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+    ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')}/api`
+    : undefined
 
   const handleUpload = async () => {
     if (!file) return alert("Select a PDF first");

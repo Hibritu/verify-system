@@ -1,5 +1,10 @@
 // API service functions for backend communication
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://verify-system-exam-result-system-backend.onrender.com/api"
+// Use only `NEXT_PUBLIC_API_URL` from environment (no local fallback).
+// The environment value is expected to be the site root (e.g. https://verify-system-exam-result-system-backend.onrender.com)
+// and we append `/api` when building request URLs.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')}/api`
+  : undefined
 
 import { authService } from "./auth"
 
