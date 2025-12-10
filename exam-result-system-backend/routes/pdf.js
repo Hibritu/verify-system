@@ -146,7 +146,8 @@ router.post('/decrypt', auth, async (req, res) => {
     if (r.rowCount === 0) return res.status(404).json({ error: 'PDF not found' });
     const filename = r.rows[0].filename;
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Prefer explicit BASE_URL (e.g. public HTTPS Render URL) to avoid mixed-content issues
+    const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '') || `${req.protocol}://${req.get('host')}`;
     const pdfUrl = `${baseUrl}/api/pdf/${encodeURIComponent(filename)}`;
     const downloadUrl = `${baseUrl}/api/pdf/by-id/${pdfId}`;
 
