@@ -9,12 +9,17 @@ const createAdminUser = async () => {
     const name = process.env.ADMIN_NAME || 'Admin User';
 
     const exists = await query('SELECT 1 FROM users WHERE email=$1', [email]);
+    const hashed = await bcrypt.hash(password, 10);
+
     if (exists.rowCount) {
-      console.log('Admin user already exists');
+      await query(
+        `UPDATE users SET name=$1, password=$2, role='admin', is_approved=true WHERE email=$3`,
+        [name, hashed, email]
+      );
+      console.log('Admin user already exists, password (and name) updated');
       process.exit(0);
     }
 
-    const hashed = await bcrypt.hash(password, 10);
     await query(
       `INSERT INTO users(name,email,password,role,is_approved) VALUES($1,$2,$3,'admin',true)`,
       [name, email, hashed]
