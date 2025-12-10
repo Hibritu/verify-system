@@ -5,7 +5,7 @@ require('dotenv').config();
 const createAdminUser = async () => {
   try {
     const email = process.env.ADMIN_EMAIL || 'admin@example.com';
-    const password = process.env.ADMIN_PASSWORD || 'Admin123';
+    const password = process.env.ADMIN_PASSWORD || 'Admin@123';
     const name = process.env.ADMIN_NAME || 'Admin User';
 
     const exists = await query('SELECT 1 FROM users WHERE email=$1', [email]);
